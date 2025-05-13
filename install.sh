@@ -53,12 +53,19 @@ else
     echo "Node.js and npm are already installed."
 fi
 
-# Install Node.js dependencies
+# Install Node.js dependencies with specific ethers version
 echo "Installing required Node.js dependencies..."
-npm install ethers@5 readline-sync axios
+npm install ethers@5.7.2 readline-sync axios
 if [ $? -ne 0 ]; then
-    echo "Failed to install Node.js dependencies. Please install them manually using 'npm install ethers@5 readline-sync axios'."
+    echo "Failed to install Node.js dependencies. Please install them manually using 'npm install ethers@5.7.2 readline-sync axios'."
     exit 1
+fi
+
+# Run npm audit fix to address vulnerabilities (without force to avoid breaking changes)
+echo "Running npm audit fix to address vulnerabilities..."
+npm audit fix
+if [ $? -ne 0 ]; then
+    echo "npm audit fix failed. Consider running 'npm audit' for details and fix manually."
 fi
 
 # Display ASCII art and Telegram intro
