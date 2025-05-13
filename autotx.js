@@ -1,63 +1,3 @@
-const { execSync } = require('child_process');
-const fs = require('fs');
-
-// ASCII Art
-const ASCII_ART = `
-███████╗██╗░░░░░░█████╗░███╗░░██╗░█████╗░██████╗░░█████╗░██╗░░░██╗  ░█████╗░░██████╗░██████╗
-██╔════╝██║░░░░░██╔══██╗████╗░██║██╔══██╗██╔══██╗██╔══██╗╚██╗░██╔╝  ██╔══██╗██╔════╝██╔════╝
-█████╗░░██║░░░░░███████║██╔██╗██║███████║██████╔╝██║░░╚═╝░╚████╔╝░  ██║░░╚═╝╚█████╗░╚█████╗░
-██╔══╝░░██║░░░░░██╔══██║██║╚████║██╔══██║██╔══██╗██║░░██╗░░╚██╔╝░░  ██║░░██╗░╚═══██╗░╚═══██╗
-███████╗███████╗██║░░██║██║░╚███║██║░░██║██║░░██║╚█████╔╝░░░██║░░░  ╚█████╔╝██████╔╝██████╔╝
-╚══════╝╚══════╝╚═╝░░╚═╝╚═╝░░╚══╝╚═╝░░╚═╝╚═╝░░╚═╝░╚════╝░░░░╚═╝░░░  ░╚════╝░╚═════╝░╚═════╝░
-`;
-
-// Function to check and install dependencies
-function installDependencies() {
-  console.log('Checking and installing required dependencies...');
-  const dependencies = ['ethers@5', 'readline-sync', 'axios'];
-  
-  dependencies.forEach(dep => {
-    try {
-      require(dep.split('@')[0]);
-      console.log(`${dep} is already installed.`);
-    } catch (e) {
-      console.log(`Installing ${dep}...`);
-      try {
-        execSync(`npm install ${dep}`, { stdio: 'inherit' });
-        console.log(`${dep} installed successfully.`);
-      } catch (error) {
-        console.error(`Failed to install ${dep}. Please install it manually using 'npm install ${dep}'.`);
-        process.exit(1);
-      }
-    }
-  });
-}
-
-// Telegram Channel Introduction
-function displayTelegramIntro() {
-  console.log(ASCII_ART);
-  console.log('\nWelcome to the CS Surabaya Telegram Channel!');
-  console.log('Join our community for updates, tips, and more: https://t.me/cssurabaya');
-  console.log('Stay connected with the latest blockchain and crypto insights!\n');
-}
-
-// Ask if the user has joined the Telegram channel
-function askJoinTelegram() {
-  const readlineSync = require('readline-sync');
-  const joined = readlineSync.question('Have you already joined our Telegram channel? (yes/no): ').toLowerCase();
-  if (joined !== 'yes') {
-    console.log('Please join our Telegram channel at https://t.me/cssurabaya for the latest updates!');
-    const proceed = readlineSync.question('Would you like to continue anyway? (yes/no): ').toLowerCase();
-    if (proceed !== 'yes') {
-      console.log('Exiting... Please join the channel and try again.');
-      process.exit(0);
-    }
-  } else {
-    console.log('Awesome! Thanks for being part of our community!');
-  }
-}
-
-// Original script (with minor adjustments for integration)
 const ethers = require('ethers');
 const readlineSync = require('readline-sync');
 const axios = require('axios');
@@ -157,7 +97,9 @@ async function pollPacketHash(txHash, retries = 50, intervalMs = 5000) {
   const data = {
     query: `
       query ($submission_tx_hash: String!) {
-        v2_transfers(args: {p_transaction_hash: $submissionazie
+        v2_transfers(args: {p_transaction_hash: $submission_tx_hash}) {
+          packet_hash
+        }
       }
     `,
     variables: {
@@ -278,15 +220,6 @@ async function bridgeUsdcSepoliaToHolesky(amountWei) {
 }
 
 async function main() {
-  // Install dependencies
-  installDependencies();
-  
-  // Display Telegram intro and ASCII art
-  displayTelegramIntro();
-  
-  // Ask if user has joined Telegram
-  askJoinTelegram();
-  
   console.log(`Using salt: ${SALT}`);
   for (let i = 0; i < loopCount; i++) {
     console.log(`\nStarting bridge loop ${i + 1}/${loopCount}`);
@@ -299,8 +232,6 @@ async function main() {
     console.log(`Loop ${i + 1} completed successfully`);
     await new Promise(resolve => setTimeout(resolve, 30000));
   }
-  console.log('\nBridging process completed');
-  console.log('Don’t forget to stay updated via our Telegram channel: https://t.me/cssurabaya');
 }
 
 main().catch((error) => {
