@@ -11,6 +11,7 @@ function isValidHex(str) {
 const SEPOLIA_RPC = 'https://eth-sepolia.public.blastapi.io';
 const SEPOLIA_CHAIN_ID = 11155111;
 const USDC_ADDRESS = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
+const WETH_ADDRESS_SEPOLIA = '0x7b79995e5f793a07bc00c21412e50ecae098e7f9'; 
 
 const HOLESKY_RPC = 'https://ethereum-holesky-rpc.publicnode.com';
 const HOLESKY_CHAIN_ID = 17000;
@@ -239,6 +240,159 @@ async function bridgeUsdcSepoliaToHolesky(amountWei) {
   }
 }
 
+async function bridgeWethSepoliaToHolesky(amountWei) {
+  console.log('Checking balances on Sepolia...');
+  const { balance: wethBalance, sufficient: hasWeth } = await checkBalance(sepoliaProvider, WETH_ADDRESS_SEPOLIA, userAddress, amountWei, 18, 'WETH');
+  const { balance: ethBalance, sufficient: hasEth } = await checkEthBalance(sepoliaProvider, userAddress, 'Sepolia', ethers.utils.parseEther('0.01').add(amountWei));
+
+  if (wethBalance.lt(wethThresholdWei)) {
+    console.log('WETH balance below 0.01 WETH, attempting to convert ETH to WETH...');
+    if (!hasEth) {
+      console.log('Insufficient ETH balance for conversion and gas');
+      return false;
+    }
+    if (ethBalance.lt(amountWei)) {
+      console.log('Insufficient ETH balance to convert to required WETH amount');
+      return false;
+    }
+
+    console.log(`Converting ${ethers.utils.formatEther(amountWei)} ETH to WETH...`);
+    const conversionSuccess = await convertEthToWeth(sepoliaWallet, WETH_ADDRESS_SEPOLIA, amountWei);
+    if (!conversionSuccess) {
+      console.log('ETH to WETH conversion failed');
+      return false;
+    }
+
+    const { sufficient: hasWethAfterConversion } = await checkBalance(sepoliaProvider, WETH_ADDRESS_SEPOLIA, userAddress, amountWei, 18, 'WETH');
+    if (!hasWethAfterConversion) {
+      console.log('Insufficient WETH balance after conversion');
+      return false;
+    }
+
+    console.log('Approving WETH on Sepolia after conversion...');
+    const approvalSuccess = await approveToken(sepoliaWallet, WETH_ADDRESS_SEPOLIA, BRIDGE_CONTRACT, amountWei, 'WETH');
+    if (!approvalSuccess) {
+      console.log('WETH approval failed after conversion');
+      return false;
+    }
+  } else if (!hasWeth) {
+    console.log('Insufficient WETH balance and above threshold, cannot bridge');
+    return false;
+  } else if (!hasEth) {
+    console.log('Insufficient ETH balance for gas');
+    return false;
+  }
+
+  const isApproved = await checkApproval(sepoliaProvider, WETH_ADDRESS_SEPOLIA, userAddress, BRIDGE_CONTRACT, amountWei, 'WETH');
+  if (!isApproved) {
+    console.log('Approving WETH on Sepolia...');
+    const approvalSuccess = await approveToken(sepoliaWallet, WETH_ADDRESS_SEPOLIA, BRIDGE_CONTRACT, amountWei, 'WETH');
+    if (!approvalSuccess) {
+      console.log('Approval failed on Sepolia');
+      return false;
+    }
+  } else {
+    console.log('WETH already approved on Sepolia');
+  }
+
+  const contract = new ethers.Contract(BRIDGE_CONTRACT, UCS03_ABI, sepoliaWallet);
+  const addressHex = userAddress.slice(2).toLowerCase();
+  const wethAddressHex = WETH_ADDRESS_SEPOLIA.slice(2).toLowerCase();
+  const bridgeAddressHex = 'b476983cc7853797fc5adc4bcad39b277bc79656';
+  const channelId = 8;
+  const timeoutHeight = 0;
+  const now = BigInt(Date.now()) * 1_000_000n;
+  const oneDayNs = 86_400_000_000_000n;
+  const timeoutTimestamp = (now + oneDayNs).toString();
+  const timestampNow = Math.floor(Date.now() / 1000);
+  const salt = ethers.utils.solidityKeccak256(['address', 'uint256'], [userAddress, timestampNow]);
+
+  const sepoliaOperand = '0x' +
+    '0000000000000000000000000000000000000000000000000000000000000020' +
+    '0000000000000000000000000000000000000000000000000000000000000001' +
+    '0000000000000000000000000000000000000000000000000000000000000020' +
+    '0000000000000000000000000000000000000000000000000000000000000001' +
+    '0000000000000000000000000000000000000000000000000000000000000003' +
+    '0000000000000000000000000000000000000000000000000000000000000060' +
+    '00000000000000000000000000000000000000000000000000000000000002c0' +
+    '0000000000000000000000000000000000000000000000000000000000000140' +
+    '0000000000000000000000000000000000000000000000000000000000000180' +
+    '00000000000000000000000000000000000000000000000000000000000001c0' +
+    '00000000000000000000000000000000000000000000000000005af3107a4000' +
+    '0000000000000000000000000000000000000000000000000000000000000200' +
+    '0000000000000000000000000000000000000000000000000000000000000240' +
+    '0000000000000000000000000000000000000000000000000000000000000012' +
+    '0000000000000000000000000000000000000000000000000000000000000000' +
+    '0000000000000000000000000000000000000000000000000000000000000280' +
+    '00000000000000000000000000000000000000000000000000005af3107a4000' +
+    '0000000000000000000000000000000000000000000000000000000000000014' +
+    addressHex.padEnd(64, '0') +
+    '0000000000000000000000000000000000000000000000000000000000000014' +
+    addressHex.padEnd(64, '0') +
+    '0000000000000000000000000000000000000000000000000000000000000014' +
+    wethAddressHex.padEnd(64, '0') +
+    '0000000000000000000000000000000000000000000000000000000000000004' +
+    '5745544800000000000000000000000000000000000000000000000000000000' +
+    '000000000000000000000000000000000000000000000000000000000000000d' +
+    '5772617070656420457468657200000000000000000000000000000000000000' +
+    '0000000000000000000000000000000000000000000000000000000000000014' +
+    bridgeAddressHex.padEnd(64, '0');
+
+  const instruction = {
+    version: 0,
+    opcode: 2,
+    operand: sepoliaOperand
+  };
+
+  let data;
+  const iface = new ethers.utils.Interface(UCS03_ABI);
+  try {
+    data = iface.encodeFunctionData('send', [channelId, timeoutHeight, timeoutTimestamp, salt, instruction]);
+  } catch (error) {
+    console.error('Failed to encode send function data (Sepolia):', error);
+    return false;
+  }
+
+  console.log(`Sepolia to Holesky (send) data length: ${data.length}`);
+  console.log(`Sepolia to Holesky (send) data valid hex: ${isValidHex(data)}`);
+
+  try {
+    const simulationResult = await sepoliaProvider.call({ to: BRIDGE_CONTRACT, data, from: userAddress });
+    console.log('Simulation successful (Sepolia send), result:', simulationResult);
+  } catch (error) {
+    console.error('Simulation failed (Sepolia send):', error);
+    if (error.data) {
+      try {
+        const decodedError = iface.parseError(error.data);
+        console.error('Decoded revert reason:', decodedError.name, decodedError.args);
+      } catch (parseError) {
+        console.error('Failed to decode revert reason:', parseError);
+      }
+    }
+    return false;
+  }
+
+  const tx = { to: BRIDGE_CONTRACT, data, chainId: SEPOLIA_CHAIN_ID };
+  try {
+    const txResponse = await sepoliaWallet.sendTransaction(tx);
+    console.log(`Sepolia Transaction sent, hash: ${txResponse.hash}`);
+    const receipt = await txResponse.wait();
+    console.log(`Sepolia to Holesky Bridge TX Hash: ${txResponse.hash}`);
+    if (receipt.status === 0) {
+      console.error('Sepolia Transaction reverted');
+      return false;
+    }
+    const packetHash = await pollPacketHash(txResponse.hash);
+    if (packetHash) {
+      console.log(`Packet Submitted: https://app.union.build/explorer/transfers/${packetHash}`);
+    }
+    return true;
+  } catch (error) {
+    console.error('Sepolia Transaction failed:', error);
+    return false;
+  }
+}
+
 async function bridgeWethHoleskyToSepolia(amountWei) {
   console.log('Checking balances on Holesky...');
   const { balance: wethBalance, sufficient: hasWeth } = await checkBalance(holeskyProvider, WETH_ADDRESS, userAddress, amountWei, 18, 'WETH');
@@ -413,6 +567,15 @@ async function main() {
       console.log('Holesky to Sepolia bridge failed');
       break;
     }
+    await new Promise(resolve => setTimeout(resolve, 100000));
+    console.log('Bridging WETH from Sepolia to Holesky...');
+    const sepoliaWethSuccess = await bridgeWethSepoliaToHolesky(wethAmountWei);
+    if (!sepoliaWethSuccess) {
+    console.log('Sepolia to Holesky WETH bridge failed');
+    break;
+    }
+
+
 
   console.log(`Loop ${i + 1} completed successfully`);
 const delaySeconds = 1 + Math.random() * 29; // Random number between 1 and 30
