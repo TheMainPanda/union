@@ -414,11 +414,11 @@ async function main() {
       break;
     }
 
-    console.log(`Loop ${i + 1} completed successfully`);
-    const delayMinutes = 10 + Math.random() * 10;
-    const delayMilliseconds = delayMinutes * 60 * 1000;
-    console.log(`Waiting for ${delayMinutes.toFixed(2)} minutes before next loop...`);
-    await new Promise(resolve => setTimeout(resolve, delayMilliseconds));
+  console.log(`Loop ${i + 1} completed successfully`);
+const delaySeconds = 1 + Math.random() * 29; // Random number between 1 and 30
+const delayMilliseconds = delaySeconds * 1000;
+console.log(`Waiting for ${delaySeconds.toFixed(2)} seconds before next loop...`);
+await new Promise(resolve => setTimeout(resolve, delayMilliseconds));
   }
 }
 
