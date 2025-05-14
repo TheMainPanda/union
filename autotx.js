@@ -560,22 +560,6 @@ async function main() {
       break;
     }
 
-    await new Promise(resolve => setTimeout(resolve, 100000)); 
-    console.log('Bridging WETH from Holesky to Sepolia...');
-    const holeskySuccess = await bridgeWethHoleskyToSepolia(wethAmountWei);
-    if (!holeskySuccess) {
-      console.log('Holesky to Sepolia bridge failed');
-      break;
-    }
-    await new Promise(resolve => setTimeout(resolve, 100000));
-    console.log('Bridging WETH from Sepolia to Holesky...');
-    const sepoliaWethSuccess = await bridgeWethSepoliaToHolesky(wethAmountWei);
-    if (!sepoliaWethSuccess) {
-    console.log('Sepolia to Holesky WETH bridge failed');
-    break;
-    }
-
-
 
   console.log(`Loop ${i + 1} completed successfully`);
 const delaySeconds = 1 + Math.random() * 29; // Random number between 1 and 30
